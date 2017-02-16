@@ -58,7 +58,6 @@ var forthWords = []string{"+", "-", "*", "/", "DUP", "DROP", "SWAP", "OVER", ":"
 func Forth(val []string) ([]int, error) {
 	items := make([]string, 0)
 	for _, st := range val {
-		fmt.Printf("Statement: %s | ", st)
 		items = append(items, itemize(st)...)
 
 	}
@@ -68,11 +67,10 @@ func Forth(val []string) ([]int, error) {
 
 // parse does the heavylifting of the statement evaluation:
 func parse(items []string) ([]int, error) {
-	wordStack := newStack()
+	// wordStack := newStack()
 	valueStack := newStack()
 
 	for _, item := range items {
-
 		i, err := strconv.Atoi(item)
 
 		// parsed without problems -> integer value
@@ -80,18 +78,119 @@ func parse(items []string) ([]int, error) {
 			valueStack.push(i)
 		} else {
 			if isWord(item) {
-				wordStack.push(item)
+				if err := eval(item, valueStack); err != nil {
+					return nil, errors.New("error while evaluating expression")
+				}
 			} else {
-				return make([]int, 0), errors.New("Wrong syntax?")
+				return nil, errors.New("Wrong syntax?")
 			}
 		}
 	}
 
 	// show stacks:
-	fmt.Printf("wordStack: %v \n", wordStack)
+	// fmt.Printf("wordStack: %v \n", wordStack)
 	fmt.Printf("valueStack: %v \n", valueStack)
 
 	return valueStack.getInts(), nil
+}
+
+// evaluate word expression:
+func eval(word string, s *stack) error {
+	switch strings.ToUpper(word) {
+	case "+":
+		return execute(s, func(a, b int) (int, error) { return a + b, nil })
+	case "-":
+		return execute(s, func(a, b int) (int, error) { return a - b, nil })
+	case "*":
+		return execute(s, func(a, b int) (int, error) { return a * b, nil })
+	case "/":
+		return execute(s, func(a, b int) (int, error) {
+			if b == 0 {
+				return 0, errors.New("Dividing by 0")
+			}
+			return a / b, nil
+		})
+	case "DUP":
+		return dup(s)
+	case "DROP":
+		return drop(s)
+	case "SWAP":
+		return swap(s)
+	case "OVER":
+		return over(s)
+	}
+	return nil
+}
+
+// dup duplicates the top element of the stack:
+func dup(s *stack) error {
+	op, err := s.pop()
+	if err != nil {
+		return errors.New("empty stack")
+	}
+	s.push(op)
+	s.push(op)
+	return nil
+}
+
+// drop removes top element from the stack
+func drop(s *stack) error {
+	_, err := s.pop()
+	if err != nil {
+		return errors.New("dropping from empty stack")
+	}
+	return nil
+}
+
+// over copies second to last element of the stack on top of it
+func over(s *stack) error {
+	op1, err := s.pop()
+	if err != nil {
+		return errors.New("empty stack")
+	}
+	op2, err := s.pop()
+	if err != nil {
+		return errors.New("empty stack")
+	}
+
+	s.push(op2)
+	s.push(op1)
+	s.push(op2)
+	return nil
+}
+
+// swap swaps top 2 elements of the stack
+func swap(s *stack) error {
+	op1, err := s.pop()
+	if err != nil {
+		return errors.New("empty stack")
+	}
+	op2, err := s.pop()
+	if err != nil {
+		return errors.New("empty stack")
+	}
+
+	s.push(op1)
+	s.push(op2)
+	return nil
+}
+
+// execute provides the arithmetic part of the interpeter
+func execute(s *stack, op func(int, int) (int, error)) error {
+	op1, err := s.pop()
+	if err != nil {
+		return errors.New("empty stack")
+	}
+	op2, err := s.pop()
+	if err != nil {
+		return errors.New("empty stack")
+	}
+	res, err := op(op2.(int), op1.(int))
+	if err != nil {
+		return err
+	}
+	s.push(res)
+	return nil
 }
 
 // divide forth statement to item:
@@ -108,7 +207,7 @@ func itemize(st string) []string {
 // it feels weird I need to go through complete slice by hand..
 func isWord(word string) bool {
 	for _, i := range forthWords {
-		if i == word {
+		if i == strings.ToUpper(word) {
 			return true
 		}
 	}
