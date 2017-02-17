@@ -1,6 +1,11 @@
 // Package forth provides minimal Forth evaluator
 package forth
 
+/*
+Warning: this is a very first version of the solution.
+The code will contain tons of completely unnecessary comments
+*/
+
 import (
 	"errors"
 	"fmt"
@@ -13,7 +18,7 @@ const testVersion = 1
 
 // before we start with Forth, we need some kind of stack implemented:
 // element: we need 2 different stacks: one for values, second for words.
-
+// Note: as it seems, a stack for ints should be enough.
 type stack struct {
 	item []interface{}
 }
@@ -58,21 +63,34 @@ var forthWords = []string{"+", "-", "*", "/", "DUP", "DROP", "SWAP", "OVER", ":"
 func Forth(val []string) ([]int, error) {
 	// dictionary of user defined words:
 	// userWords := make(map[string]string)
-
-	items := make([]string, 0)
-	for _, st := range val {
-		items = append(items, itemize(st)...)
-
-	}
-	fmt.Printf("Items: %v \n", items)
-	return parse(items)
-}
-
-// parse does the heavylifting of the statement evaluation:
-func parse(items []string) ([]int, error) {
-	// wordStack := newStack()
 	valueStack := newStack()
 
+	// val will contain one or more Forth statements.
+	// Each of them needs to be parsed and evaluated separately
+	// The only thing that joins them is the common stack and user defined words dictionary
+	for _, st := range val {
+		items := itemize(st)
+		fmt.Printf("Items: %v \n", items)
+		if err := parse(items, valueStack); err != nil {
+			return nil, err
+		}
+	}
+	return valueStack.getInts(), nil
+}
+
+// parse does the heavylifting of the statement evaluation.
+// Evaluation result stays in the modified valueStack.
+// return value is used to check whether error occured
+func parse(items []string, valueStack *stack) error {
+
+	// potentially, the range solution will need to be replaced
+	// with a plain loop with indices.
+	// the ":" word starts a definition of the new word: everything up to the ";"
+	// goes as a def to the map. Then update the counter on the current position in the
+	// slice.
+	// Also -> check for words in the forthWords and in the map.
+	// should it be a user def. word: -> create a new items string slice with the user word
+	// replaced by it's definition and recursively call the parse function.
 	for _, item := range items {
 		i, err := strconv.Atoi(item)
 
@@ -82,19 +100,18 @@ func parse(items []string) ([]int, error) {
 		} else {
 			if isWord(item) {
 				if err := eval(item, valueStack); err != nil {
-					return nil, errors.New("error while evaluating expression")
+					return err
 				}
 			} else {
-				return nil, errors.New("Wrong syntax?")
+				return errors.New("Wrong syntax?")
 			}
 		}
 	}
 
 	// show stacks:
-	// fmt.Printf("wordStack: %v \n", wordStack)
 	fmt.Printf("valueStack: %v \n", valueStack)
 
-	return valueStack.getInts(), nil
+	return nil
 }
 
 // evaluate word expression:
