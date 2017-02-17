@@ -56,6 +56,9 @@ var forthWords = []string{"+", "-", "*", "/", "DUP", "DROP", "SWAP", "OVER", ":"
 
 // Forth is the main evaluator function
 func Forth(val []string) ([]int, error) {
+	// dictionary of user defined words:
+	// userWords := make(map[string]string)
+
 	items := make([]string, 0)
 	for _, st := range val {
 		items = append(items, itemize(st)...)
@@ -137,7 +140,7 @@ func dup(s *stack) error {
 func drop(s *stack) error {
 	_, err := s.pop()
 	if err != nil {
-		return errors.New("dropping from empty stack")
+		return err
 	}
 	return nil
 }
@@ -146,11 +149,11 @@ func drop(s *stack) error {
 func over(s *stack) error {
 	op1, err := s.pop()
 	if err != nil {
-		return errors.New("empty stack")
+		return err
 	}
 	op2, err := s.pop()
 	if err != nil {
-		return errors.New("empty stack")
+		return err
 	}
 
 	s.push(op2)
