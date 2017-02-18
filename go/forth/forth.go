@@ -57,12 +57,12 @@ func (s *stack) getInts() []int {
 	return ints
 }
 
-var forthWords = []string{"+", "-", "*", "/", "DUP", "DROP", "SWAP", "OVER", ":"}
+var forthWords = []string{"+", "-", "*", "/", "DUP", "DROP", "SWAP", "OVER"}
 
 // Forth is the main evaluator function
 func Forth(val []string) ([]int, error) {
 	// dictionary of user defined words:
-	// userWords := make(map[string]string)
+	userWords := make(map[string][]string)
 	valueStack := newStack()
 
 	// val will contain one or more Forth statements.
@@ -71,9 +71,10 @@ func Forth(val []string) ([]int, error) {
 	for _, st := range val {
 		items := itemize(st)
 		fmt.Printf("Items: %v \n", items)
-		if err := parse(items, valueStack); err != nil {
+		if err := parse(items, valueStack, userWords); err != nil {
 			return nil, err
 		}
+		fmt.Printf("UserWords: %v\n", userWords)
 	}
 	return valueStack.getInts(), nil
 }
@@ -81,7 +82,7 @@ func Forth(val []string) ([]int, error) {
 // parse does the heavylifting of the statement evaluation.
 // Evaluation result stays in the modified valueStack.
 // return value is used to check whether error occured
-func parse(items []string, valueStack *stack) error {
+func parse(items []string, valueStack *stack, userWords map[string][]string) error {
 
 	// potentially, the range solution will need to be replaced
 	// with a plain loop with indices.
@@ -91,26 +92,64 @@ func parse(items []string, valueStack *stack) error {
 	// Also -> check for words in the forthWords and in the map.
 	// should it be a user def. word: -> create a new items string slice with the user word
 	// replaced by it's definition and recursively call the parse function.
-	for _, item := range items {
-		i, err := strconv.Atoi(item)
+	index := 0
+	for index < len(items) {
+		i, err := strconv.Atoi(items[index])
 
 		// parsed without problems -> integer value
 		if err == nil {
 			valueStack.push(i)
 		} else {
-			if isWord(item) {
-				if err := eval(item, valueStack); err != nil {
+			// if ":" is the first word -> definition follows
+			// and nothing else should be in the statement
+			if index == 0 && items[index] == ":" {
+				err := addWordToDict(items, userWords)
+				if err != nil {
+					return err
+				}
+				// return nil (no error, word inserted OK)
+				return nil
+			}
+
+			// in any other case try to parse existing words:
+			// if not a build-in word -> check if defined word
+			// if defined word -> replace with definition, call parse recursively
+			if isWord(items[index]) {
+				if err := eval(items[index], valueStack); err != nil {
 					return err
 				}
 			} else {
 				return errors.New("Wrong syntax?")
 			}
 		}
+		index++
 	}
 
 	// show stacks:
 	fmt.Printf("valueStack: %v \n", valueStack)
 
+	return nil
+}
+
+// add a user defined word to dictionary:
+func addWordToDict(items []string, userWords map[string][]string) error {
+	fmt.Printf("To Add: %v\n", items)
+
+	// 0. can't be empty: has to contain :, ;, word and def -> min 4 items
+	if len(items) < 4 {
+		return errors.New("Invalid word definition - too short")
+	}
+
+	// 1. it has to end with the semicolon:
+	if items[len(items)-1] != ";" {
+		return errors.New("User word definition doesn't end with ;")
+	}
+
+	// 2. the user defined word can't be one of the ForthWords:
+	if isWord(items[1]) {
+		return errors.New("Can't redefine build-in Forth word")
+	}
+	userWords[items[1]] = items[2 : len(items)-1]
 	return nil
 }
 
@@ -183,11 +222,11 @@ func over(s *stack) error {
 func swap(s *stack) error {
 	op1, err := s.pop()
 	if err != nil {
-		return errors.New("empty stack")
+		return err
 	}
 	op2, err := s.pop()
 	if err != nil {
-		return errors.New("empty stack")
+		return err
 	}
 
 	s.push(op1)
@@ -199,11 +238,11 @@ func swap(s *stack) error {
 func execute(s *stack, op func(int, int) (int, error)) error {
 	op1, err := s.pop()
 	if err != nil {
-		return errors.New("empty stack")
+		return err
 	}
 	op2, err := s.pop()
 	if err != nil {
-		return errors.New("empty stack")
+		return err
 	}
 	res, err := op(op2.(int), op1.(int))
 	if err != nil {
