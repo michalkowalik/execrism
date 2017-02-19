@@ -74,7 +74,6 @@ func Forth(val []string) ([]int, error) {
 		if err := parse(items, valueStack, userWords); err != nil {
 			return nil, err
 		}
-		fmt.Printf("UserWords: %v\n", userWords)
 	}
 	return valueStack.getInts(), nil
 }
@@ -118,6 +117,12 @@ func parse(items []string, valueStack *stack, userWords map[string][]string) err
 				if err := eval(items[index], valueStack); err != nil {
 					return err
 				}
+				// check if user word:
+			} else if _, ok := userWords[items[index]]; ok {
+				// parse the contains of the user word dictionary.
+				// stack, index and userWords should stay unchanged
+				// TODO: idea: encapsulate stack, ndex and userWords as an environment?
+				parse(userWords[items[index]], valueStack, userWords)
 			} else {
 				return errors.New("Wrong syntax?")
 			}
