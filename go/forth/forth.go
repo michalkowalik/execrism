@@ -8,7 +8,6 @@ The code will contain tons of completely unnecessary comments
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -70,7 +69,6 @@ func Forth(val []string) ([]int, error) {
 	// The only thing that joins them is the common stack and user defined words dictionary
 	for _, st := range val {
 		items := itemize(st)
-		fmt.Printf("Items: %v \n", items)
 		if err := parse(items, valueStack, userWords); err != nil {
 			return nil, err
 		}
@@ -83,14 +81,6 @@ func Forth(val []string) ([]int, error) {
 // return value is used to check whether error occured
 func parse(items []string, valueStack *stack, userWords map[string][]string) error {
 
-	// potentially, the range solution will need to be replaced
-	// with a plain loop with indices.
-	// the ":" word starts a definition of the new word: everything up to the ";"
-	// goes as a def to the map. Then update the counter on the current position in the
-	// slice.
-	// Also -> check for words in the forthWords and in the map.
-	// should it be a user def. word: -> create a new items string slice with the user word
-	// replaced by it's definition and recursively call the parse function.
 	index := 0
 	for index < len(items) {
 		i, err := strconv.Atoi(items[index])
@@ -111,35 +101,28 @@ func parse(items []string, valueStack *stack, userWords map[string][]string) err
 			}
 
 			// in any other case try to parse existing words:
-			// if not a build-in word -> check if defined word
-			// if defined word -> replace with definition, call parse recursively
-			if isWord(items[index]) {
-				if err := eval(items[index], valueStack); err != nil {
-					return err
-				}
-				// check if user word:
-			} else if _, ok := userWords[items[index]]; ok {
+			// start with user defined words as redefinition is allowed
+			if _, ok := userWords[items[index]]; ok {
 				// parse the contains of the user word dictionary.
 				// stack, index and userWords should stay unchanged
 				// TODO: idea: encapsulate stack, ndex and userWords as an environment?
 				parse(userWords[items[index]], valueStack, userWords)
+			} else if isWord(items[index]) {
+				if err := eval(items[index], valueStack); err != nil {
+					return err
+				}
+				// check if user word:
 			} else {
 				return errors.New("Wrong syntax?")
 			}
 		}
 		index++
 	}
-
-	// show stacks:
-	fmt.Printf("valueStack: %v \n", valueStack)
-
 	return nil
 }
 
 // add a user defined word to dictionary:
 func addWordToDict(items []string, userWords map[string][]string) error {
-	fmt.Printf("To Add: %v\n", items)
-
 	// 0. can't be empty: has to contain :, ;, word and def -> min 4 items
 	if len(items) < 4 {
 		return errors.New("Invalid word definition - too short")
@@ -150,9 +133,9 @@ func addWordToDict(items []string, userWords map[string][]string) error {
 		return errors.New("User word definition doesn't end with ;")
 	}
 
-	// 2. the user defined word can't be one of the ForthWords:
-	if isWord(items[1]) {
-		return errors.New("Can't redefine build-in Forth word")
+	// 2. can't redefine numbers
+	if _, err := strconv.Atoi(items[1]); err == nil {
+		return errors.New("Can't redefine numbers")
 	}
 	userWords[items[1]] = items[2 : len(items)-1]
 	return nil
