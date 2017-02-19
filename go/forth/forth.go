@@ -124,13 +124,13 @@ func addWordToDict(items []string, userWords map[string][]string) error {
 func eval(word string, s *stack) error {
 	switch strings.ToUpper(word) {
 	case "+":
-		return execute(s, func(a, b int) (int, error) { return a + b, nil })
+		return binaryOp(s, func(a, b int) (int, error) { return a + b, nil })
 	case "-":
-		return execute(s, func(a, b int) (int, error) { return a - b, nil })
+		return binaryOp(s, func(a, b int) (int, error) { return a - b, nil })
 	case "*":
-		return execute(s, func(a, b int) (int, error) { return a * b, nil })
+		return binaryOp(s, func(a, b int) (int, error) { return a * b, nil })
 	case "/":
-		return execute(s, func(a, b int) (int, error) {
+		return binaryOp(s, func(a, b int) (int, error) {
 			if b == 0 {
 				return 0, errors.New("Dividing by 0")
 			}
@@ -152,7 +152,7 @@ func eval(word string, s *stack) error {
 func dup(s *stack) error {
 	op, err := s.pop()
 	if err != nil {
-		return errors.New("empty stack")
+		return err
 	}
 	s.push(op)
 	s.push(op)
@@ -201,8 +201,8 @@ func swap(s *stack) error {
 	return nil
 }
 
-// execute provides the arithmetic part of the interpeter
-func execute(s *stack, op func(int, int) (int, error)) error {
+// binaryOp provides the arithmetic part of the interpeter
+func binaryOp(s *stack, op func(int, int) (int, error)) error {
 	op1, err := s.pop()
 	if err != nil {
 		return err
