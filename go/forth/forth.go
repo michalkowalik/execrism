@@ -1,11 +1,6 @@
 // Package forth provides minimal Forth evaluator
 package forth
 
-/*
-Warning: this is a very first version of the solution.
-The code will contain tons of completely unnecessary comments
-*/
-
 import (
 	"errors"
 	"regexp"
@@ -16,44 +11,31 @@ import (
 const testVersion = 1
 
 // before we start with Forth, we need some kind of stack implemented:
-// element: we need 2 different stacks: one for values, second for words.
-// Note: as it seems, a stack for ints should be enough.
 type stack struct {
-	item []interface{}
+	item []int
 }
 
 // get new stack:
 func newStack() *stack {
-	return &stack{make([]interface{}, 0)}
+	return &stack{make([]int, 0)}
 }
 
 // push new item to stack
-func (s *stack) push(i interface{}) {
+func (s *stack) push(i int) {
 	s.item = append(s.item, i)
 }
 
 // pop an item from stack. return error if trying to pop from empty stack
-func (s *stack) pop() (interface{}, error) {
+func (s *stack) pop() (int, error) {
 	l := len(s.item)
 
 	if l == 0 {
-		return nil, errors.New("Empty Stack")
+		return 0, errors.New("Empty Stack")
 	}
 
 	res := s.item[l-1]
 	s.item = s.item[:l-1]
 	return res, nil
-}
-
-// get back the stack items as integers:
-func (s *stack) getInts() []int {
-	ints := make([]int, len(s.item))
-
-	for i := range s.item {
-		ints[i] = s.item[i].(int)
-	}
-
-	return ints
 }
 
 var forthWords = []string{"+", "-", "*", "/", "DUP", "DROP", "SWAP", "OVER"}
@@ -66,19 +48,17 @@ func Forth(val []string) ([]int, error) {
 
 	// val will contain one or more Forth statements.
 	// Each of them needs to be parsed and evaluated separately
-	// The only thing that joins them is the common stack and user defined words dictionary
 	for _, st := range val {
 		items := itemize(st)
 		if err := parse(items, valueStack, userWords); err != nil {
 			return nil, err
 		}
 	}
-	return valueStack.getInts(), nil
+	return valueStack.item, nil
 }
 
 // parse does the heavylifting of the statement evaluation.
 // Evaluation result stays in the modified valueStack.
-// return value is used to check whether error occured
 func parse(items []string, valueStack *stack, userWords map[string][]string) error {
 
 	index := 0
@@ -90,7 +70,6 @@ func parse(items []string, valueStack *stack, userWords map[string][]string) err
 			valueStack.push(i)
 		} else {
 			// if ":" is the first word -> definition follows
-			// and nothing else should be in the statement
 			if index == 0 && items[index] == ":" {
 				err := addWordToDict(items, userWords)
 				if err != nil {
@@ -103,15 +82,14 @@ func parse(items []string, valueStack *stack, userWords map[string][]string) err
 			// in any other case try to parse existing words:
 			// start with user defined words as redefinition is allowed
 			if _, ok := userWords[items[index]]; ok {
-				// parse the contains of the user word dictionary.
+
+				// parse the value from the user word dictionary.
 				// stack, index and userWords should stay unchanged
-				// TODO: idea: encapsulate stack, ndex and userWords as an environment?
 				parse(userWords[items[index]], valueStack, userWords)
 			} else if isWord(items[index]) {
 				if err := eval(items[index], valueStack); err != nil {
 					return err
 				}
-				// check if user word:
 			} else {
 				return errors.New("Wrong syntax?")
 			}
@@ -123,6 +101,7 @@ func parse(items []string, valueStack *stack, userWords map[string][]string) err
 
 // add a user defined word to dictionary:
 func addWordToDict(items []string, userWords map[string][]string) error {
+
 	// 0. can't be empty: has to contain :, ;, word and def -> min 4 items
 	if len(items) < 4 {
 		return errors.New("Invalid word definition - too short")
@@ -232,7 +211,7 @@ func execute(s *stack, op func(int, int) (int, error)) error {
 	if err != nil {
 		return err
 	}
-	res, err := op(op2.(int), op1.(int))
+	res, err := op(op2, op1)
 	if err != nil {
 		return err
 	}
@@ -240,7 +219,7 @@ func execute(s *stack, op func(int, int) (int, error)) error {
 	return nil
 }
 
-// divide forth statement to item:
+// divide forth statement into list of items:
 // use regular expression to clean multiple white characters
 func itemize(st string) []string {
 	re1 := regexp.MustCompile("[\t\n\v\f\r\x00\x13]")
@@ -250,8 +229,7 @@ func itemize(st string) []string {
 	return strings.Split(st, " ")
 }
 
-// isWord check if an item is a defined Forth word
-// it feels weird I need to go through complete slice by hand..
+// isWord checks if an item is a defined Forth word
 func isWord(word string) bool {
 	for _, i := range forthWords {
 		if i == strings.ToUpper(word) {
